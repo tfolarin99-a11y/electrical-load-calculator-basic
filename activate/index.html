@@ -421,8 +421,15 @@
         document.getElementById('dashboardLink').href = url + '/dashboard/';
 
         // Only offer the upgrade path if there's a higher tier to move to
-        if (PLAN_ORDER[data.plan] < PLAN_ORDER.pro) {
+        const canUpgrade = PLAN_ORDER[data.plan] < PLAN_ORDER.pro;
+        if (canUpgrade) {
           document.getElementById('upgradeBtn').style.display = 'inline-block';
+        }
+
+        // Came from an upgrade product's purchase-note link — jump straight into upgrade mode
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('upgrade') === 'true' && canUpgrade) {
+          showUpgradeForm();
         }
         return;
       }
