@@ -168,6 +168,18 @@
       text-decoration: none; transition: opacity 0.2s;
     }
     .btn-go:hover { opacity: 0.85; }
+
+    .btn-go.secondary {
+      background: transparent; color: var(--accent);
+      border: 1px solid var(--accent); margin-left: 10px;
+    }
+    .btn-go.secondary:hover { opacity: 1; background: rgba(245,158,11,0.08); }
+
+    .back-link {
+      display: block; margin-top: 16px; font-size: 12px;
+      color: var(--muted); text-decoration: underline; cursor: pointer;
+    }
+    .back-link:hover { color: var(--text); }
   </style>
 </head>
 <body>
@@ -190,9 +202,9 @@
 
     <!-- FORM STATE -->
     <div id="formState">
-      <span class="card-icon">🔑</span>
-      <h1>Activate Your Plan</h1>
-      <p class="subtitle">
+      <span class="card-icon" id="formIcon">🔑</span>
+      <h1 id="formTitle">Activate Your Plan</h1>
+      <p class="subtitle" id="formSubtitle">
         Enter the order number from your purchase confirmation email.
         Your account will be reviewed and activated — usually within a few hours.
       </p>
@@ -208,7 +220,7 @@
       </div>
 
       <div class="field">
-        <label>Plan Purchased</label>
+        <label id="planSelectLabel">Plan Purchased</label>
         <select id="planSelect">
           <option value="">— Select your plan —</option>
           <option value="basic">PowerDesk™ Basic</option>
@@ -221,6 +233,8 @@
 
       <div class="status-msg" id="statusMsg"></div>
 
+      <a class="back-link" id="cancelUpgradeLink" onclick="cancelUpgrade()" style="display:none">← Back</a>
+
       <div class="footer-links">
         <a onclick="signOut()">Sign out</a> &nbsp;·&nbsp;
         <a href="/dashboard/">Go to Dashboard</a>
@@ -232,7 +246,10 @@
       <div class="check">✅</div>
       <h2>Plan Active</h2>
       <p id="activeMsg">Your plan is already active. Head to the dashboard to get started.</p>
-      <a class="btn-go" id="dashboardLink" href="/dashboard/">Open Dashboard</a>
+      <div>
+        <a class="btn-go" id="dashboardLink" href="/dashboard/">Open Dashboard</a>
+        <a class="btn-go secondary" id="upgradeBtn" onclick="showUpgradeForm()" style="display:none">Upgrade Plan</a>
+      </div>
       <div class="footer-links" style="margin-top:16px">
         <a onclick="signOut()">Sign out</a>
       </div>
@@ -256,7 +273,12 @@
       pro:      'https://electrical-load-calculator.vercel.app'
     };
 
+    const PLAN_ORDER  = { basic: 0, standard: 1, pro: 2 };
+    const PLAN_LABELS = { basic: 'PowerDesk™ Basic', standard: 'PowerDesk™ Standard', pro: 'PowerDesk™ Pro' };
+
     let currentUser = null;
+    let currentPlan = null;   // the user's currently active plan, if any
+    let isUpgrade   = false;  // whether the form is currently in "upgrade" mode
 
     async function signOut() {
       await sb.auth.signOut();
@@ -284,8 +306,13 @@
       if (!purchaseEmail) { showStatus('Please enter the email used at checkout.', 'error'); return; }
       if (!plan)          { showStatus('Please select the plan you purchased.', 'error'); return; }
       if (!currentUser)   { showStatus('Session expired. Please sign in again.', 'error'); return; }
+      if (isUpgrade && PLAN_ORDER[plan] <= PLAN_ORDER[currentPlan]) {
+        showStatus('Please select a higher tier than your current plan.', 'error');
+        return;
+      }
 
       const btn = document.getElementById('submitBtn');
+      const idleLabel = isUpgrade ? 'Submit Upgrade Request' : 'Submit Activation Request';
       btn.disabled = true;
       btn.textContent = 'Submitting…';
 
@@ -297,7 +324,7 @@
       });
 
       btn.disabled = false;
-      btn.textContent = 'Submit Activation Request';
+      btn.textContent = idleLabel;
 
       if (error) {
         if (error.code === '23505') {
@@ -310,14 +337,56 @@
       }
 
       showStatus(
-        '✅ Claim submitted! Your plan will be activated after review — usually within a few hours. ' +
-        'You\'ll be able to access the tool as soon as it\'s approved.',
+        isUpgrade
+          ? '✅ Upgrade request submitted! Your account will be moved to the new plan after review — usually within a few hours.'
+          : '✅ Claim submitted! Your plan will be activated after review — usually within a few hours. ' +
+            'You\'ll be able to access the tool as soon as it\'s approved.',
         'success'
       );
 
       document.getElementById('orderNumber').value   = '';
-      document.getElementById('purchaseEmail').value = '';
       document.getElementById('planSelect').value    = '';
+    }
+
+    // ── UPGRADE MODE: switch the form to only offer higher tiers ────────
+    function populateUpgradeOptions() {
+      const select = document.getElementById('planSelect');
+      select.innerHTML = '<option value="">— Select your new plan —</option>';
+      Object.keys(PLAN_ORDER)
+        .filter(function (p) { return PLAN_ORDER[p] > PLAN_ORDER[currentPlan]; })
+        .forEach(function (p) {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = PLAN_LABELS[p];
+          select.appendChild(opt);
+        });
+    }
+
+    function showUpgradeForm() {
+      isUpgrade = true;
+      hideStatus();
+      populateUpgradeOptions();
+
+      document.getElementById('formIcon').textContent = '⬆️';
+      document.getElementById('formTitle').textContent = 'Upgrade Your Plan';
+      document.getElementById('formSubtitle').textContent =
+        'Enter the order number from your upgrade purchase confirmation email. ' +
+        'Your account will be moved to the new plan after review — usually within a few hours.';
+      document.getElementById('planSelectLabel').textContent = 'Upgrading To';
+      document.getElementById('submitBtn').textContent = 'Submit Upgrade Request';
+      document.getElementById('purchaseEmail').value = currentUser.email || '';
+      document.getElementById('orderNumber').value = '';
+      document.getElementById('cancelUpgradeLink').style.display = 'block';
+
+      document.getElementById('alreadyActive').style.display = 'none';
+      document.getElementById('formState').style.display     = 'block';
+    }
+
+    function cancelUpgrade() {
+      isUpgrade = false;
+      hideStatus();
+      document.getElementById('formState').style.display     = 'none';
+      document.getElementById('alreadyActive').style.display  = 'block';
     }
 
     // ── INIT: check auth + existing plan ────────────────────────────────
@@ -340,6 +409,7 @@
 
       if (data && data.plan) {
         // Plan already active — show "go to dashboard" state
+        currentPlan = data.plan;
         const planLabel = data.plan.charAt(0).toUpperCase() + data.plan.slice(1);
         document.getElementById('formState').style.display   = 'none';
         document.getElementById('alreadyActive').style.display = 'block';
@@ -349,6 +419,11 @@
         // Link directly to the correct app's dashboard
         const url = PLAN_URLS[data.plan] || window.location.origin;
         document.getElementById('dashboardLink').href = url + '/dashboard/';
+
+        // Only offer the upgrade path if there's a higher tier to move to
+        if (PLAN_ORDER[data.plan] < PLAN_ORDER.pro) {
+          document.getElementById('upgradeBtn').style.display = 'inline-block';
+        }
         return;
       }
 
