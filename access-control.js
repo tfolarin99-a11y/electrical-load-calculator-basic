@@ -92,13 +92,13 @@ function closeUpgradeModal(evt) {
 }
 
 function handleUpgradeStandard() {
-  // Point to your Standard edition product page — update URL as needed
-  window.open("https://taewoodigital.com/product/electrasuite-standard/", "_blank", "noopener,noreferrer");
+  // Existing Basic customers pay only the difference to move to Standard
+  window.open("https://taewoodigital.com/product/powerdesk-upgrade-basic-standard/", "_blank", "noopener,noreferrer");
 }
 
 function handleUpgradePro() {
-  // Point to your Pro edition product page — update URL as needed
-  window.open("https://taewoodigital.com/product/electrasuite-pro/", "_blank", "noopener,noreferrer");
+  // Existing Basic customers pay only the difference to move to Pro
+  window.open("https://taewoodigital.com/product/powerdesk-upgrade-basic-%E2%86%92-pro/", "_blank", "noopener,noreferrer");
 }
 
 // Close modal on Escape key
