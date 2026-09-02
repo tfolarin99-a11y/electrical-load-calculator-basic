@@ -199,7 +199,7 @@
     let appLoaded = false;
 
     async function signOut() {
-      await sb.auth.signOut();
+      await sb.auth.signOut({ scope: 'global' });
       window.location.href = '/auth/';
     }
 
@@ -229,10 +229,19 @@
       }
 
       if (plan !== THIS_PLAN) {
+        const alreadyBounced = new URLSearchParams(window.location.search).get('xplan') === '1';
+        if (alreadyBounced) {
+          // We already redirected once and still don't match — this domain has a stale
+          // cached session for the wrong account. Clear it and send to a fresh login
+          // instead of bouncing again, which would risk an infinite redirect loop.
+          await sb.auth.signOut();
+          window.location.replace('/auth/?mismatch=1');
+          return;
+        }
         // Wrong tool for this plan — redirect to the correct one
         const target = PLAN_URLS[plan];
         if (target) {
-          window.location.replace(target + '/dashboard/');
+          window.location.replace(target + '/dashboard/?xplan=1');
         } else {
           console.error('[ElectraSuite] Unknown plan URL for:', plan);
           showActivationBanner(); // Fallback: show banner rather than blank screen
